@@ -1,0 +1,9 @@
+scrapy
+gunicorn
+flask
+Pillow
+fuzzywuzzy
+requests
+python-Levenshtein
+
+elasticsearch

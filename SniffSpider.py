@@ -1,4 +1,5 @@
 from urllib.parse import urljoin
+from eslog import eslog
 from scrapy import Spider
 from scrapy.selector import Selector
 from scrapy.http import Request
@@ -7,13 +8,12 @@ from scrapeProc import html_sniffer
 from scrapy.exceptions import CloseSpider
 from scrapy.crawler import CrawlerRunner
 from twisted.internet import reactor
-import redis
 
 class SniffSpider(Spider):
     name = "sniff"
     fully_extractable_pages  = 0
     non_extractable_pages  = 0
-    red = redis.Redis(host='iscrape.snoutsearch.com',port='6379')
+    esend = eslog('scraped_pages','product')    
 
     def parse(self, response):
         crawledLinks = []
@@ -31,6 +31,7 @@ class SniffSpider(Spider):
             isniff = html_sniffer(response.body.decode('utf-8'), self.start_urls[0])
         except (AttributeError, UnicodeDecodeError):
             print('probably not a normal page. considering adding regex filtering')
+            #self.esend.get_health()
             isniff = None
         if isniff:
             try:
@@ -40,21 +41,19 @@ class SniffSpider(Spider):
                 price = None
             if price and title and image:
                 self.fully_extractable_pages += 1                
-                print('EXTRACTABLE: {0}'.format(self.fully_extractable_pages))
                 if self.fully_extractable_pages > 10:
                     print('This domain has extractable products on it.')
-                    #toss into a redis queue for full scraping and log
-                    self.red.sadd('domains_to_scrape',self.start_urls[0])
                     raise CloseSpider('sufficient_confirmation')
                 item['price'] = price
                 item['title'] = title
-                item['image'] = image
-                print(item)
+                item['image'] = image[0]
+                #push item to elastic search
+                res = self.esend.push(dict(item))
+                print(res)
             else:
                 non_extractable_pages += 1
                 if self.non_extractable_pages > 500:
                     print('This domain does not have extractable products on it.')
-                    #toss into a redis list for failures and log
                     raise CloseSpider('sufficient_confirmation')
             yield item
 

@@ -5,9 +5,7 @@ from twisted.internet import reactor
 from flask import Flask, request, jsonify
 app = Flask(__name__)
 
-    # turn into flask endpoint 
     # master node should regulate what gets pushed to the flask enpoint
-    #red = redis.Redis(host='iscrape.snoutsearch.com',port='6379')
     #url_to_crawl = str(red.spop('urls_to_evaluate'),'utf-8')
 @app.route('/eval',methods=['GET', 'POST'])
 def eval_url():
