@@ -8,7 +8,7 @@ from scrapeProc import html_sniffer
 from scrapy.crawler import CrawlerRunner
 from twisted.internet import reactor
 
-class SniffSpider(Spider):
+class CrawlSpider(Spider):
     name = "sniff"
     esend = eslog('scraped_pages','product')    
 

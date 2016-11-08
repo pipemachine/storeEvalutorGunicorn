@@ -1,3 +1,4 @@
+import redis
 from urllib.parse import urljoin
 from eslog import eslog
 from scrapy import Spider
@@ -13,7 +14,8 @@ class SniffSpider(Spider):
     name = "sniff"
     fully_extractable_pages  = 0
     non_extractable_pages  = 0
-    esend = eslog('scrape_info','message')    
+    elog = eslog('scrape_info','message')    
+    red = redis.Redis(host = 'iscrape.snoutsearch.com',port = '6379')
 
     def parse(self, response):
         crawledLinks = []
@@ -41,17 +43,21 @@ class SniffSpider(Spider):
             if price and title and image:
                 self.fully_extractable_pages += 1                
                 if self.fully_extractable_pages > 10:
-                    #print('This domain has extractable products on it.')
+                    self.red.sadd('urls_to_scrape',self.start_urls[0])
+                    res = self.elog.info({
+                                      'msg':'sniffed store and found it scrapable.',
+                                      'sucess':True,
+                                      'url': self.start_urls[0]
+                                       })
                     raise CloseSpider('sufficient_confirmation')
-                item['price'] = price
-                item['title'] = title
-                item['image'] = image[0]
-                #push item to elastic search
-                res = self.esend.push(dict(item))
             else:
                 non_extractable_pages += 1
                 if self.non_extractable_pages > 500:
-                    print('This domain does not have extractable products on it.')
+                    res = self.elog.info({
+                                      'msg':'no extractable products found',
+                                      'sucess':False,
+                                      'url': self.start_urls[0]
+                                       })
                     raise CloseSpider('sufficient_confirmation')
             yield item
 
