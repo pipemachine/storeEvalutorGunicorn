@@ -1,17 +1,25 @@
 import scrapy
 from scrapy.crawler import CrawlerRunner
 from SniffSpider import SniffSpider
+from CrawlSpider import CrawlSpider
 from twisted.internet import reactor
 from flask import Flask, request, jsonify
 app = Flask(__name__)
 
-    # master node should regulate what gets pushed to the flask enpoint
-    #url_to_crawl = str(red.spop('urls_to_evaluate'),'utf-8')
 @app.route('/eval',methods=['GET', 'POST'])
 def eval_url():
-    content = request.json
+    """
+    Note that this function relies on the flask request context
+    The requests.json data dict contains the following parameters
+    param: data['type_of_crawl']: 'full' calls CrawlSpider for full crawl
+    param: data['url']: the url that dictates allowed_domains and start_url  
+    """
+    data = request.json
     app.logger.debug(request.json)
-    url_to_crawl = content['url']     
+    spider = SniffSpider
+    if data['type_of_crawl'] == 'full':
+        spider = CrawlSpider
+    url_to_crawl = data['url']     
     start_urls = [url_to_crawl]
     allowed_domains = [url_to_crawl.split('/')[2]]
     
@@ -22,7 +30,9 @@ def eval_url():
         'ROBOTSTXT_OBEY' : True,
         'LOG_LEVEL' : 'ERROR'
     })
-    d = runner.crawl(SniffSpider, start_urls=start_urls, allowed_domains = allowed_domains)
+    d = runner.crawl(spider, 
+                     start_urls=start_urls, 
+                     allowed_domains = allowed_domains)
     d.addBoth(lambda _: reactor.stop())
     reactor.run()
     return jsonify({"complete":True})
