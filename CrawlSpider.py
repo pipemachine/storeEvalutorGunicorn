@@ -1,3 +1,4 @@
+import random
 from urllib.parse import urljoin
 from eslog import eslog
 from scrapy import Spider
@@ -22,7 +23,15 @@ class CrawlSpider(Spider):
                     url = link.extract().strip()
                     url = urljoin(self.start_urls[0], url)
                     crawledLinks.append(url)
-                    yield Request(url, self.parse)
+                    #allowed domains include splash proxies, so we have to filter
+                    if self.start_urls[0] not in url:
+                        crawledLinks.append(url)
+                    else:
+                        rand = random.randint(0,len(self.allowed_domains)-2)
+                        splashIP = self.allowed_domains[rand]
+                        url = 'http://{0}:8050/render.html?url={1}'.format(splashIP,url)
+                        print(url)
+                        yield Request(url, self.parse)
             item = SniffItem()
             item['url'] = response.url
             isniff = html_sniffer(response.body.decode('utf-8'), self.start_urls[0])
@@ -37,6 +46,7 @@ class CrawlSpider(Spider):
                 #print('probably not a normal page. considering adding regex filtering')
                 price = None
             if price and title and image:
+                print(price, title, image)
                 item['price'] = price
                 item['title'] = title
                 item['image'] = image[0]
