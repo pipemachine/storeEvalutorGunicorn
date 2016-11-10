@@ -23,10 +23,13 @@ class SniffSpider(Spider):
         # do not result in normal html
         try:
             for link in response.xpath('//a/@href'):
-                if link not in crawledLinks:
+                if link not in crawledLinks and allowed_domains[0] in link:
                     url = link.extract().strip()
                     url = urljoin(self.start_urls[0], url)
                     crawledLinks.append(url)
+                    #purl = 'proxy + url'
+                    url  = 'http://64.137.199.141:8050/render.html?url='+url
+                    print(url)
                     yield Request(url, self.parse)
             item = SniffItem()
             item['url'] = response.url
@@ -42,9 +45,10 @@ class SniffSpider(Spider):
                 price = None
             if price and title and image:
                 self.fully_extractable_pages += 1                
-                if self.fully_extractable_pages > 10:
+                print(price)
+                if self.fully_extractable_pages == 10:
                     self.red.sadd('urls_to_scrape',self.start_urls[0])
-                    res = self.elog.info({
+                    res = self.elog.push({
                                       'msg':'sniffed store and found it scrapable.',
                                       'sucess':True,
                                       'url': self.start_urls[0]
@@ -53,7 +57,7 @@ class SniffSpider(Spider):
             else:
                 non_extractable_pages += 1
                 if self.non_extractable_pages > 500:
-                    res = self.elog.info({
+                    res = self.elog.push({
                                       'msg':'no extractable products found',
                                       'sucess':False,
                                       'url': self.start_urls[0]
@@ -70,6 +74,6 @@ if __name__ == '__main__':
         'ROBOTSTXT_OBEY' : True,
         'LOG_LEVEL' : 'ERROR'
     })
-    d = runner.crawl(SniffSpider, start_urls=['http://www.citygear.com/'],allowed_domains = ["citygear.com"])
+    d = runner.crawl(SniffSpider, start_urls=['http://www.citygear.com/'],allowed_domains = ["citygear.com","64.137.199.141"])
     d.addBoth(lambda _: reactor.stop())
     reactor.run()
