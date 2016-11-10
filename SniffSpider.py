@@ -1,4 +1,5 @@
 import redis
+import random
 from urllib.parse import urljoin
 from eslog import eslog
 from scrapy import Spider
@@ -23,14 +24,18 @@ class SniffSpider(Spider):
         # do not result in normal html
         try:
             for link in response.xpath('//a/@href'):
-                if link not in crawledLinks and allowed_domains[0] in link:
+                if link not in crawledLinks:
                     url = link.extract().strip()
                     url = urljoin(self.start_urls[0], url)
                     crawledLinks.append(url)
-                    #purl = 'proxy + url'
-                    url  = 'http://64.137.199.141:8050/render.html?url='+url
-                    print(url)
-                    yield Request(url, self.parse)
+                    #allowed domains include splash proxies, so we have to filter
+                    if self.start_urls[0] not in url:
+                        crawledLinks.append(url)
+                    else:
+                        rand = random.randint(0,len(self.allowed_domains)-2)
+                        splashIP = self.allowed_domains[rand]
+                        url = 'http://{0}:8050/render.html?url={1}'.format(splashIP,url)
+                        yield Request(url, self.parse)
             item = SniffItem()
             item['url'] = response.url
             isniff = html_sniffer(response.body.decode('utf-8'), self.start_urls[0])
@@ -45,7 +50,7 @@ class SniffSpider(Spider):
                 price = None
             if price and title and image:
                 self.fully_extractable_pages += 1                
-                print(price)
+                print(price, title, image)
                 if self.fully_extractable_pages == 10:
                     self.red.sadd('urls_to_scrape',self.start_urls[0])
                     res = self.elog.push({
@@ -74,6 +79,10 @@ if __name__ == '__main__':
         'ROBOTSTXT_OBEY' : True,
         'LOG_LEVEL' : 'ERROR'
     })
-    d = runner.crawl(SniffSpider, start_urls=['http://www.citygear.com/'],allowed_domains = ["citygear.com","64.137.199.141"])
+    with open('splashNodes') as f:
+        nodeURLs = f.readlines()
+    domains = [x.replace('\n','') for x in nodeURLs] 
+    domains.append('citygear.com')
+    d = runner.crawl(SniffSpider, start_urls=['http://www.citygear.com/'],allowed_domains = domains)
     d.addBoth(lambda _: reactor.stop())
     reactor.run()
