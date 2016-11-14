@@ -1,4 +1,5 @@
 import random
+import redis
 from urllib.parse import urljoin
 from eslog import eslog
 from scrapy import Spider
@@ -30,10 +31,9 @@ class CrawlSpider(Spider):
                         rand = random.randint(0,len(self.allowed_domains)-2)
                         splashIP = self.allowed_domains[rand]
                         url = 'http://{0}:8050/render.html?url={1}'.format(splashIP,url)
-                        print(url)
                         yield Request(url, self.parse)
             item = SniffItem()
-            item['url'] = response.url
+            item['url'] = response.url.split("url=")[1]
             isniff = html_sniffer(response.body.decode('utf-8'), self.start_urls[0])
         except (AttributeError, UnicodeDecodeError):
             #print('probably not a normal page. considering adding regex filtering')
@@ -45,8 +45,7 @@ class CrawlSpider(Spider):
             except TypeError:
                 #print('probably not a normal page. considering adding regex filtering')
                 price = None
-            if price and title and image:
-                print(price, title, image)
+            if price and title and 'http' in image[0]:
                 item['price'] = price
                 item['title'] = title
                 item['image'] = image[0]
@@ -54,3 +53,21 @@ class CrawlSpider(Spider):
                 res = self.esend.push(dict(item))
             yield item
 
+if __name__ == '__main__':
+    red = redis.Redis(host = 'iscrape.snoutsearch.com',port = '6379')
+    runner = CrawlerRunner({
+        'USER_AGENT': 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)',
+        #'AUTOTHROTTLE_ENABLED' : True,
+        'DOWNLAOD_DELAY' : 0.25,
+        'ROBOTSTXT_OBEY' : True,
+        'LOG_LEVEL' : 'ERROR'
+    })
+    newurl = red.spop('urls_to_scrape').decode('utf-8')
+    start_urls = [newurl]
+    with open('splashNodes') as f:
+        nodeURLs = f.readlines()
+    domains = [x.replace('\n','') for x in nodeURLs]
+    domains.append(newurl.split('/')[2])
+    d = runner.crawl(CrawlSpider, start_urls=start_urls,allowed_domains = domains)
+    d.addBoth(lambda _: reactor.stop())
+    reactor.run()

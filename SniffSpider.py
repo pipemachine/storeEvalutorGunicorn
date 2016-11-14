@@ -48,9 +48,9 @@ class SniffSpider(Spider):
             except TypeError:
                 #print('probably not a normal page. considering adding regex filtering')
                 price = None
-            if price and title and image:
+            if price and title and 'http' in image[0]:
                 self.fully_extractable_pages += 1                
-                print(price, title, image)
+                #print(price, title, image[0])
                 if self.fully_extractable_pages == 10:
                     self.red.sadd('urls_to_scrape',self.start_urls[0])
                     res = self.elog.push({
@@ -60,8 +60,10 @@ class SniffSpider(Spider):
                                        })
                     raise CloseSpider('sufficient_confirmation')
             else:
-                non_extractable_pages += 1
-                if self.non_extractable_pages > 500:
+                #print('non extract: {0}'.format(self.non_extractable_pages))
+                self.non_extractable_pages += 1
+                if self.non_extractable_pages == 350 and self.fully_extractable_pages < 2: 
+                    print('finally dismissing the spider')
                     res = self.elog.push({
                                       'msg':'no extractable products found',
                                       'sucess':False,
@@ -72,6 +74,7 @@ class SniffSpider(Spider):
 
 
 if __name__ == '__main__':
+    red = redis.Redis(host = 'iscrape.snoutsearch.com',port = '6379')
     runner = CrawlerRunner({
         'USER_AGENT': 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)',
         #'AUTOTHROTTLE_ENABLED' : True,
@@ -79,10 +82,12 @@ if __name__ == '__main__':
         'ROBOTSTXT_OBEY' : True,
         'LOG_LEVEL' : 'ERROR'
     })
+    newurl = red.spop('urls_to_eval').decode('utf-8')
+    start_urls = [newurl]
     with open('splashNodes') as f:
         nodeURLs = f.readlines()
     domains = [x.replace('\n','') for x in nodeURLs] 
-    domains.append('citygear.com')
-    d = runner.crawl(SniffSpider, start_urls=['http://www.citygear.com/'],allowed_domains = domains)
+    domains.append(newurl.split('/')[2])
+    d = runner.crawl(SniffSpider, start_urls=start_urls,allowed_domains = domains)
     d.addBoth(lambda _: reactor.stop())
     reactor.run()

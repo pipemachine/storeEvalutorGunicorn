@@ -63,10 +63,8 @@ class eslog():
         param: data: dict of data to log.
         Places time stamp in dict and sends to index/doc_type of the ES endpoint
         """
-        print(data)
         res = self.es.index(index=self.index, doc_type=self.doc_type, body=data)        
-        print('damn dawg- anything?')
-        print(res)
+        #print(res)
         return res
         
 if __name__ == '__main__':
